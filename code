@@ -1,0 +1,666 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# # 爬取数据
+
+# In[1]:
+
+
+from urllib import request
+import urllib
+import requests
+import jsonpath
+import json
+import csv
+import os
+import codecs
+import time
+from fake_useragent import UserAgent
+from collections import Counter
+from random import randint
+import re
+from pandas import DataFrame as df
+import pandas as pd
+import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
+from matplotlib.patches import Polygon
+from matplotlib.colors import rgb2hex
+from matplotlib.collections import PatchCollection
+from matplotlib import pylab
+import numpy as np
+from os import path
+from PIL import Image
+from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
+from wordcloud import WordCloud  # 词云库
+import jieba
+from pandas import DataFrame,Series
+from matplotlib.dates import AutoDateLocator, DateFormatter 
+from matplotlib.dates import (YEARLY, DateFormatter,
+                              rrulewrapper, RRuleLocator, drange)
+import datetime
+
+
+# ## json获取数据
+
+# In[259]:
+
+
+ua = UserAgent()
+with codecs.open('tbxd.csv','a+', 'utf-8') as file_obj:
+    writer = csv.writer(file_obj)
+    for i in range(0,67):
+        url= 'http://m.maoyan.com/mmdb/comments/movie/1215605.json?_v_=yes&offset='+str(i*15)+'&startTime=0'
+        headers = { "User-Agent":str(ua.random)}
+        html_content=requests.get(url,headers=headers).content
+        pro_html_content = html_content.decode('utf-8')
+        data=json.loads(pro_html_content)
+        for i in range(0,15):
+            try:
+                city = data['cmts'][i]['cityName']
+            except:
+                city = '未披露'
+            try:
+                content =data['cmts'][i]['content']
+            except:
+                content = '未披露'
+            try:
+                score = data['cmts'][i]['score']
+            except:
+                score = '未披露'
+            try:
+                time = data['cmts'][i]['time']
+            except:
+                time = '未披露'
+            try:
+                gender = data['cmts'][i]['gender']
+            except:
+                gender = '未披露'
+            print(city,content,score,time,gender)
+            writer.writerow([city,content,score,time,gender])
+        #data = json.dumps(pro_html_content,ensure_ascii=False)
+        print(data)
+        #data
+
+
+# In[33]:
+
+
+with codecs.open('tbxd.csv','a+', 'utf-8') as file_obj:
+    writer = csv.writer(file_obj)
+    writer.writerow(['city name','content','score','time','gender'])
+    for i in range(0,15):
+        try:
+            city = data['cmts'][i]['cityName']
+        except:
+            city = '未披露'
+        try:
+            content =data['cmts'][i]['content']
+        except:
+            content = '未披露'
+        try:
+            score = data['cmts'][i]['score']
+        except:
+            score = '未披露'
+        try:
+            time = data['cmts'][i]['time']
+        except:
+            time = '未披露'
+        try:
+            gender = data['cmts'][i]['gender']
+        except:
+            gender = '未披露'
+        print(city,content,score,time,gender)
+        writer.writerow([city,content,score,time,gender])
+
+
+# # 画地图
+
+# In[260]:
+
+
+
+#file = open(,'rb')
+#city = file['city name']#,content,score,time
+city_lis = []
+with codecs.open('tbxd1.csv', 'r+','utf-8') as csvfile:
+    reader = csv.reader(csvfile)
+    for line in reader:
+        city = line[0].strip()                                  # 第一列city
+        content = line[1].strip()
+        score = line[2].strip()
+        time = line[3].strip()
+        gender = line[4].strip()
+        city_lis.append(city)
+        print(city,content,score,time)
+
+
+# In[497]:
+
+
+# 统计序列中元素出现的频率
+data = city_lis
+#print(data)
+c = dict.fromkeys(data, 0)
+#print(c)
+for i in data:
+    c[i] += 1
+c2 = Counter(data)
+print(type(c2))
+#print(c2[10]) # 显示10出现的频率
+a = c2.most_common(334)
+print(type(a)) # 以list的形式列出出现频率最高的三组元素
+print(a) # 以list的形式列出出现频率最高的三组元素
+
+
+# In[499]:
+
+
+#转化为字典
+dict_ ={}
+dict_ = dict(a)
+#print(dict_)
+#转化为numpy
+data = pd.DataFrame.from_dict(dict_, orient='index')
+#改变数据列的名称
+#data = data.rename(columns={'0':'number'}, inplace = True)
+data.columns = ['人数']
+data.head().T
+
+
+# In[495]:
+
+
+del(dict)
+
+
+# In[270]:
+
+
+dict_ ={}
+dict_ = dict(a)
+dicta = pd.DataFrame.from_dict(dict_,orient='index',columns = ['人数'])
+dicta = dicta.reset_index().rename(columns={'index':'城市'})
+dicta['城市名'] = dicta.城市.str[:3]
+dicta.set_index('城市名', inplace=True)
+del dicta['城市']
+dicta.to_csv('trycmtscity.csv')
+dicta
+
+
+# In[469]:
+
+
+plt.figure(figsize = (20,10))
+# m= Basemap(llcrnrlon=73, llcrnrlat=18, urcrnrlon=135, urcrnrlat=55) #指定中国的经纬度
+m= Basemap(llcrnrlon=77, llcrnrlat=14, urcrnrlon=140, urcrnrlat=51,            projection='lcc', lat_1=33, lat_2=45, lon_0=100) # ‘lcc'将投影方式设置为兰伯特投影
+# projection='ortho' 投影方式设置为正投影——类似地球仪
+m.readshapefile(r'E:\software\ana\gadm36_CHN_shp\gadm36_CHN_2', 'states', drawbounds = True)
+datac = pd.read_csv('citypop.csv')
+statenames=[]
+colors={}
+patches = []
+cmap = plt.cm.YlOrRd # 国旗色红黄色调
+vmax = 50
+vmin = 0
+for shapedict in m.states_info:
+    statename = shapedict['NL_NAME_2']
+    p = statename
+    s = p
+    p = statename.split('|')
+    if len(p) > 1:
+        s = p[1]
+    if "市" in str(s):
+        s =s.replace('市','')
+    #else:
+    #    s = p[0]
+    #s = s[:2]
+    #if s == '黑龍':
+    #    s = '黑龙'
+    statenames.append(s)
+    #print(s)
+    try:
+        pop = dicta['人数'][s]
+    except:pop = 0
+    colors[s] = cmap(np.sqrt((pop - vmin) / (vmax - vmin)))[:3] #根据归一化后的人口数映射颜色
+ax = plt.gca()
+    #print(pop)
+for nshape, seg in enumerate(m.states):
+        color = rgb2hex(colors[statenames[nshape]])
+        poly = Polygon(seg, facecolor=color, edgecolor=color)
+        patches.append(poly)
+        ax.add_patch(poly)
+
+m.readshapefile(r'E:\software\ana\gadm36_TWN_shp\gadm36_TWN_2', 'states', drawbounds=True)
+for nshape, seg in enumerate(m.states):
+    poly = Polygon(seg, facecolor='w')
+    patches.append(poly)
+    ax.add_patch(poly)
+        
+colors1 = [i[1] for i in colors.values()]
+colorVotes = plt.cm.YlOrRd
+p = PatchCollection(patches, cmap =colorVotes)
+p.set_array(np.array(colors1))
+pylab.colorbar(p)
+
+m.drawcoastlines() #绘制海岸线
+m.drawcountries(linewidth=1.5) #绘制国家边界线
+plt.savefig("filename.png")
+plt.show()
+
+
+# # 词频分析
+
+# ### 重新分类评论
+
+# In[272]:
+
+
+with codecs.open('tbxd1.csv', 'r+','utf-8') as csvfile:
+    with codecs.open('tbxdctms.txt', 'a+','utf-8') as txtfile:
+        reader = csv.reader(csvfile)
+        writer = csv.writer(txtfile) 
+        for line in reader:                                # 第一列city
+            content = line[1].strip()
+            writer.writerow([content])
+
+
+# ### 读取
+
+# In[275]:
+
+
+# 1.读取本地中文文本文件
+d = path.dirname('E:\作业')
+text = open('tbxdctms.txt',encoding='utf-8').read()
+# 2.使用jieba进行中文分词;cut_all参数表示分词模式,True为全局模式,False为精确模式,默认为False
+cut_text = jieba.cut(text, cut_all=False)
+result = '/'.join(cut_text) # 因为cut方法返回的是一个生成器,所以要么使用for循环遍历，要么使用join()
+alice_coloring = np.array(Image.open(path.join(d, r"E:\ppt\ppt用\tbxd.png")))
+#stopwords = set(STOPWORDS)#设置英文的停止词
+#stopwords.add("said")
+# 2.创建WordCloud实例,设置词云图宽高(最终以矩形显示)、背景颜色(默认黑色)和最大显示字数
+#wc = WordCloud(width=6000, height=4000, background_color="white", mask=alice_coloring,
+#             max_words=4000)
+# 3.创建WordCloud实例,设置词云图宽高(最终以矩形显示)、背景颜色(默认黑色)和最大显示字数
+wc = WordCloud(font_path=r'C:\Windows\Fonts\SimHei.ttf', width=600, height=400, background_color="white", mask=alice_coloring, max_words=4000)
+#print(type(result))
+# 4.根据分词后的中文文本，统计词频，生成词云图
+wc.generate(result)
+# 5.使用matplotlib绘图
+plt.imshow(wc)
+plt.axis("off") # 取消坐标系
+plt.show()      # 在IDE中显示图片
+# 6.将生成的词云图保存在本地
+wc.to_file(r'try.png')
+
+
+# # 找评论数的人名
+
+# In[480]:
+
+
+text = open('tbxdctms.txt',encoding='utf-8').read()
+#print(text)
+qiangsen = int(text.count('强森'))
+jiesen =  int(text.count('杰森斯坦森'))
+fan = int(text.count('范迪塞尔'))
+guoda = int(text.count('郭达'))
+baoluo = int(text.count('保罗'))
+actress = int(text.count('女主'))
+print(qiangsen,jiesen,fan,guoda,baoluo,actress)
+nname = ['强森','杰森斯坦森','范迪塞尔','郭达','保罗','女主']
+times = [qiangsen,jiesen,fan,guoda,baoluo,actress]
+name_lis = []
+for i in zip(nname,times):
+    print(i)
+    name_lis.append(i)
+name_dict = dict(name_lis)
+name_dict
+
+
+# In[493]:
+
+
+nname = ['强森','杰森斯坦森','范迪塞尔','郭达','保罗','女主']
+times = [qiangsen,jiesen,fan,guoda,baoluo,actress]
+dict = {
+    '次数':times
+}
+
+df = pd.DataFrame(dict,index= nname)
+df.plot(kind = 'barh',figsize=(10,8),fontsize=20,colormap='tab20b_r')
+
+
+# # 直方图
+
+# In[276]:
+
+
+#引入中文环境
+import matplotlib as mpl
+mpl.rcParams['font.sans-serif'] = ['KaiTi']
+mpl.rcParams['font.serif'] = ['KaiTi']
+# mpl.rcParams['axes.unicode_minus'] = False # 解决保存图像是负号'-'显示为方块的问题,或者转换负号为字符串
+
+import seaborn as sns
+sns.set_style("darkgrid",{"font.sans-serif":['KaiTi', 'Arial']})
+
+
+# In[281]:
+
+
+txt = open('tbxdctms.txt',encoding='utf-8').read()
+#打开停用词
+stop = open(r"E:\实习工作\科创版调查\回复txt\停用词库.txt",errors='ignore').read()
+words  = jieba.lcut(txt)
+
+counts = {}
+for word in words:
+    if len(word)>1:
+        if word not in stop:
+                counts[word] = counts.get(word,0) + 1
+
+items = list(counts.items())
+items.sort(key=lambda x:x[1], reverse=True)
+
+for i in range(0,50):
+    word, count = items[i]
+    print ("{0:<10}{1:>5}".format(word, count))
+
+
+# In[489]:
+
+
+word_lis = []
+freq_lis = []
+for i in range(0,10):
+    word, count = items[i]
+    word_lis.append(word)
+    freq_lis.append(count)
+dict = {
+    '频率':freq_lis
+}
+
+df = pd.DataFrame(dict,index= word_lis)
+df.plot(kind = 'barh',figsize=(10,8),fontsize=20,colormap='Set2')
+
+
+# ### 找男女比
+
+# In[284]:
+
+
+gender_lis = []
+with codecs.open('tbxd1.csv', 'r+','utf-8') as csvfile:
+        reader = csv.reader(csvfile) 
+        for line in reader:                                # 第一列city
+            gender = line[4].strip()
+            print(gender)
+            gender_lis.append(gender)
+gender_lis
+
+
+# In[287]:
+
+
+# 统计序列中元素出现的频率
+genderdata = gender_lis
+#print(data)
+c = dict.fromkeys(genderdata, 0)
+#print(c)
+for i in genderdata:
+    c[i] += 1
+c2 = Counter(genderdata)
+#print(type(c2))
+#print(c2[10]) # 显示10出现的频率
+b = c2.most_common(333) # 以list的形式列出出现频率最高的三组元素
+dict_1 = dict(b)
+
+
+# In[288]:
+
+
+labels = dict_1.keys()
+labels_lis = list(labels)
+sizes = dict_1.values()
+values_lis = list(sizes)
+
+
+# In[175]:
+
+
+
+
+
+# In[289]:
+
+
+import matplotlib.pyplot as plot
+# # 饼状图
+# plot.figure(figsize=(8,8))
+labels =['男','未披露','女']
+sizes = values_lis
+colors = ['coral', 'wheat', 'salmon']
+
+explode = (0.01, 0, 0)
+
+patches, l_text, p_text = plot.pie(sizes, explode=explode, labels=labels, colors=colors,
+                                   labeldistance=1.1, autopct='%2.1f%%', shadow=False,
+                                   startangle=90, pctdistance=0.6)
+
+# labeldistance，文本的位置离远点有多远，1.1指1.1倍半径的位置
+# autopct，圆里面的文本格式，%3.1f%%表示小数有三位，整数有一位的浮点数
+# shadow，饼是否有阴影
+# startangle，起始角度，0，表示从0开始逆时针转，为第一块。一般选择从90度开始比较好看
+# pctdistance，百分比的text离圆心的距离
+# patches, l_texts, p_texts，为了得到饼图的返回值，p_texts饼图内部文本的，l_texts饼图外label的文本
+
+# 改变文本的大小
+# 方法是把每一个text遍历。调用set_size方法设置它的属性
+for t in l_text:
+    t.set_size = 30
+for t in p_text:
+    t.set_size = 20
+# 设置x，y轴刻度一致，这样饼图才能是圆的
+plot.axis('equal')
+plot.legend(loc='upper left', bbox_to_anchor=(1, 1))
+# loc: 表示legend的位置，包括'upper right','upper left','lower right','lower left'等
+# bbox_to_anchor: 表示legend距离图形之间的距离，当出现图形与legend重叠时，可使用bbox_to_anchor进行调整legend的位置
+# 由两个参数决定，第一个参数为legend距离左边的距离，第二个参数为距离下面的距离
+plot.grid()
+plot.show()
+
+
+# # 得分
+
+# In[291]:
+
+
+score_lis = []
+with codecs.open('tbxd1.csv', 'r+','utf-8') as csvfile:
+        reader = csv.reader(csvfile) 
+        for line in reader:                                # 第一列city
+            score = line[2].strip()
+            score = float(score)*2
+            print(score)
+            score_lis.append(score)
+score_lis
+
+
+# In[292]:
+
+
+# 统计序列中元素出现的频率
+scoredata = score_lis
+#print(data)
+scorenum = dict.fromkeys(scoredata, 0)
+#print(c)
+for i in scoredata:
+    scorenum[i] += 1
+scorenum2 = Counter(scoredata)
+#print(type(c2))
+#print(c2[10]) # 显示10出现的频率
+scorec = scorenum2.most_common(333) # 以list的形式列出出现频率最高的三组元素
+dict_score = dict(scorec)
+dict_score
+
+
+# In[293]:
+
+
+word_lis= list(dict_score.keys())
+freq_lis= list(dict_score.values())
+#list(word_)
+
+
+# In[294]:
+
+
+dictscore = {
+    '频率':freq_lis
+}
+df = pd.DataFrame(dictscore,index= word_lis)
+df.plot(kind = 'barh',figsize=(10,8),fontsize=20,colormap='icefire_r')
+
+
+# """Colormap red is not recognized. Possible values are: Accent, Accent_r, Blues, Blues_r, BrBG, BrBG_r, BuGn, BuGn_r, BuPu, BuPu_r, CMRmap, CMRmap_r, Dark2, Dark2_r, GnBu, GnBu_r, Greens, Greens_r, Greys, Greys_r, OrRd, OrRd_r, Oranges, Oranges_r, PRGn, PRGn_r, Paired, Paired_r, Pastel1, Pastel1_r, Pastel2, Pastel2_r, PiYG, PiYG_r, PuBu, PuBuGn, PuBuGn_r, PuBu_r, PuOr, PuOr_r, PuRd, PuRd_r, Purples, Purples_r, RdBu, RdBu_r, RdGy, RdGy_r, RdPu, RdPu_r, RdYlBu, RdYlBu_r, RdYlGn, RdYlGn_r, Reds, Reds_r, Set1, Set1_r, Set2, Set2_r, Set3, Set3_r, Spectral, Spectral_r, Wistia, Wistia_r, YlGn, YlGnBu, YlGnBu_r, YlGn_r, YlOrBr, YlOrBr_r, YlOrRd, YlOrRd_r, afmhot, afmhot_r, autumn, autumn_r, binary, binary_r, bone, bone_r, brg, brg_r, bwr, bwr_r, cividis, cividis_r, cool, cool_r, coolwarm, coolwarm_r, copper, copper_r, cubehelix, cubehelix_r, flag, flag_r, gist_earth, gist_earth_r, gist_gray, gist_gray_r, gist_heat, gist_heat_r, gist_ncar, gist_ncar_r, gist_rainbow, gist_rainbow_r, gist_stern, gist_stern_r, gist_yarg, gist_yarg_r, gnuplot, gnuplot2, gnuplot2_r, gnuplot_r, gray, gray_r, hot, hot_r, hsv, hsv_r, icefire, icefire_r, inferno, inferno_r, jet, jet_r, magma, magma_r, mako, mako_r, nipy_spectral, nipy_spectral_r, ocean, ocean_r, pink, pink_r, plasma, plasma_r, prism, prism_r, rainbow, rainbow_r, rocket, rocket_r, seismic, seismic_r, spring, spring_r, summer, summer_r, tab10, tab10_r, tab20, tab20_r, tab20b, tab20b_r, tab20c, tab20c_r, terrain, terrain_r, twilight, twilight_r, twilight_shifted, twilight_shifted_r, viridis, viridis_r, vlag, vlag_r, winter, winter_r"""
+
+# # 才想起来没有画时间
+
+# In[464]:
+
+
+time_lis = []
+with codecs.open('tbxd1.csv', 'r+','utf-8') as csvfile:
+        reader = csv.reader(csvfile) 
+        for line in reader:                                # 第一列city
+            time = line[3].strip()
+            #print(time)
+            time_lis.append(time)
+time_lis
+score_lis
+time_score = []
+for i in zip(time_lis,score_lis):
+    time_score.append(i)
+time_scoreDf = pd.DataFrame(time_score, columns=['time', 'score']) 
+time_scoreDf
+
+
+# # 时间序列
+
+# In[322]:
+
+
+df = pd.DataFrame(time_scoreDf, columns=['time','score'])
+plt.plot_date(time_scoreDf.time,time_scoreDf.score, fmt='b.')
+ax = plt.gca()
+#ax.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d %H:%M'))  #设置时间显示格式
+#ax.xaxis.set_major_locator(AutoDateLocator(maxticks=24))       #设置时间间隔  
+#plt.xticks(rotation=90, ha='center')
+#label = ['speedpoint']
+#plt.legend(label, loc='upper right')
+
+#plt.grid()
+
+#ax.set_title(u'传输速度', fontproperties='SimHei',fontsize=14)  
+#ax.set_xlabel('dtime')
+#ax.set_ylabel('Speed(KB/s)')
+
+
+# In[298]:
+
+
+df = pd.DataFrame(time_scoreDf, columns=['time','score'])
+plt.plot_date(time_scoreDf.time,time_scoreDf.score, fmt='b.')
+plt.xticks(rotation=90, ha='center')
+ax.set_xlabel('分数')
+ax.set_ylabel('时间')
+plt.grid()
+plt.show()
+
+
+# # 归类后简化
+
+# In[465]:
+
+
+time_lis = []
+with codecs.open('tbxd1.csv', 'r+','utf-8') as csvfile:
+        reader = csv.reader(csvfile) 
+        for line in reader:                                # 第一列city
+            time = line[3].strip()
+            data = time.split(' ')[0]
+            minu = time.split(' ')[1]
+            hour = minu.split(':')[0]
+            #print(minu,type(minu))
+            time_lis.append(hour)
+time_lis
+score_lis
+time_score = []
+for i in zip(time_lis,score_lis):
+    time_score.append(i)
+    #print(i)
+time_score
+
+
+# In[466]:
+
+
+time_scoreDf = pd.DataFrame(time_score, columns=['time', 'score']) 
+#time_scoreDf.group_by('time')
+groupd =time_scoreDf['score'].groupby(time_scoreDf['time'])
+mean_ = groupd.mean()
+count_ = groupd.count()
+#time_scoreDf
+
+
+# In[467]:
+
+
+mean_ = pd.DataFrame({'mean_':mean_})
+mean_
+
+
+# ## 单轴
+
+# In[468]:
+
+
+count_ = pd.DataFrame({'count_':count_})
+regroup =  mean_.merge(count_,left_index=True,right_index=True, how='left')
+regroup.reset_index(inplace=True)
+Myimg=pd.DataFrame(list(regroup.mean_),index = list(regroup.time))
+Myimg.plot(kind='line',marker='o',color='r',title='平均评分')
+
+
+# ### 双轴
+
+# In[462]:
+
+
+data = {
+    '平均评分': list(regroup.mean_),
+    '评分人数': list(regroup.count_)
+}
+ 
+df = pd.DataFrame(data, index=list(regroup.time))
+ 
+ax = df.plot(
+    secondary_y=['评分人数'],
+    x_compat=True,
+    grid=True)
+ 
+ax.set_title("人数-分数-时间")
+ax.set_ylabel('平均评分')
+ax.grid(linestyle="--", alpha=0.3)
+ 
+ax.right_ax.set_ylabel('评分人数')
+ 
+plt.show()
+
+
+# In[446]:
+
+
+
+
